@@ -17,152 +17,116 @@
         lowLevelAble?: boolean;
     }
 
-    const effectV2Types = [
-        //Special
-        'v2GetDisplayState',
-        'v2SetDisplayState',
-        'v2GetRequestState',
-        'v2SetRequestState',
-        'v2GetRequestStateRole',
-        'v2SetRequestStateRole',
-        'v2GetRequestStateLength',
-
-        //Control
-        'v2SetVar',
-        'v2IfAdvanced',
-        'v2LoopNTimes',
-        'v2Loop',
-        'v2BreakLoop',
-        'v2Command',
-        'v2ConsoleLog',
-        'v2RunTrigger',
-        'v2StopTrigger',
-
-        //Chat
-        'v2CutChat',
-        'v2ModifyChat',
-        'v2SystemPrompt',
-        'v2Impersonate',
-        'v2GetLastMessage',
-        'v2GetLastUserMessage',
-        'v2GetLastCharMessage',
-        'v2GetMessageAtIndex',
-        'v2GetMessageCount',
-        'v2GetFirstMessage',
-        'v2QuickSearchChat',
-
-        //Low Level
-        'v2SendAIprompt',
-        'v2ImgGen',
-        'v2CheckSimilarity',
-        'v2RunLLM',
-
-        //Alert
-        'v2ShowAlert',
-        'v2GetAlertInput',
-        'v2GetAlertSelect',
-
-        //Lorebook V2
-        'v2GetAllLorebooks',
-        'v2GetLorebookByName',
-        'v2GetLorebookByIndex',
-        'v2CreateLorebook',
-        'v2ModifyLorebookByIndex',
-        'v2DeleteLorebookByIndex',
-        'v2GetLorebookCountNew',
-        'v2SetLorebookAlwaysActive',
-
-        //String
-        'v2RegexTest',
-        'v2ExtractRegex',
-        'v2GetCharAt',
-        'v2GetCharCount',
-        'v2ToLowerCase',
-        'v2ToUpperCase',
-        'v2SetCharAt',
-        'v2SplitString',
-        'v2ConcatString',
-
-        //Data
-        'v2GetCharacterDesc',
-        'v2SetCharacterDesc',
-        'v2GetPersonaDesc',
-        'v2SetPersonaDesc',
-        'v2GetReplaceGlobalNote',
-        'v2SetReplaceGlobalNote',
-        'v2GetAuthorNote',
-        'v2SetAuthorNote',
-
-        //Array
-        'v2MakeArrayVar',
-        'v2GetArrayVarLength',
-        'v2GetArrayVar',
-        'v2SetArrayVar',
-        'v2PushArrayVar',
-        'v2PopArrayVar',
-        'v2ShiftArrayVar',
-        'v2UnshiftArrayVar',
-        'v2SpliceArrayVar',
-        'v2SliceArrayVar',
-        'v2GetIndexOfValueInArrayVar',
-        'v2RemoveIndexFromArrayVar',
-
-        //Others
-        'v2Random',
-        'v2UpdateGUI',
-        'v2UpdateChatAt',
-        'v2Wait',
-        'v2StopPromptSending',
-        'v2Tokenize'
-    ]
-
     const effectCategories = {
-        'Special': ['v2GetDisplayState', 'v2SetDisplayState', 'v2GetRequestState', 'v2SetRequestState', 'v2GetRequestStateRole', 'v2SetRequestStateRole', 'v2GetRequestStateLength'],
-        'Control': ['v2SetVar', 'v2IfAdvanced', 'v2LoopNTimes', 'v2Loop', 'v2BreakLoop', 'v2Command', 'v2ConsoleLog', 'v2RunTrigger', 'v2StopTrigger'],
-        'Chat': ['v2CutChat', 'v2ModifyChat', 'v2SystemPrompt', 'v2Impersonate', 'v2GetLastMessage', 'v2GetLastUserMessage', 'v2GetLastCharMessage', 'v2GetMessageAtIndex', 'v2GetMessageCount', 'v2GetFirstMessage', 'v2QuickSearchChat'],
-        'Low Level': ['v2SendAIprompt', 'v2ImgGen', 'v2CheckSimilarity', 'v2RunLLM'],
-        'Alert': ['v2ShowAlert', 'v2GetAlertInput', 'v2GetAlertSelect'],
-        'Lorebook V2': ['v2GetAllLorebooks', 'v2GetLorebookByName', 'v2GetLorebookByIndex', 'v2CreateLorebook', 'v2ModifyLorebookByIndex', 'v2DeleteLorebookByIndex', 'v2GetLorebookCountNew', 'v2SetLorebookAlwaysActive'],
-        'String': ['v2RegexTest', 'v2ExtractRegex', 'v2GetCharAt', 'v2GetCharCount', 'v2ToLowerCase', 'v2ToUpperCase', 'v2SetCharAt', 'v2SplitString', 'v2ConcatString'],
-        'Data': ['v2GetCharacterDesc', 'v2SetCharacterDesc', 'v2GetPersonaDesc', 'v2SetPersonaDesc', 'v2GetReplaceGlobalNote', 'v2SetReplaceGlobalNote', 'v2GetAuthorNote', 'v2SetAuthorNote'],
-        'Array': ['v2MakeArrayVar', 'v2GetArrayVarLength', 'v2GetArrayVar', 'v2SetArrayVar', 'v2PushArrayVar', 'v2PopArrayVar', 'v2ShiftArrayVar', 'v2UnshiftArrayVar', 'v2SpliceArrayVar', 'v2SliceArrayVar', 'v2GetIndexOfValueInArrayVar', 'v2RemoveIndexFromArrayVar'],
-        'Others': ['v2Random', 'v2UpdateGUI', 'v2UpdateChatAt', 'v2Wait', 'v2StopPromptSending', 'v2Tokenize']
+        'Special': [
+            'v2GetDisplayState',
+            'v2SetDisplayState',
+            'v2GetRequestState',
+            'v2SetRequestState',
+            'v2GetRequestStateRole',
+            'v2SetRequestStateRole',
+            'v2GetRequestStateLength'
+        ],
+        'Control': [
+            'v2SetVar',
+            'v2IfAdvanced',
+            'v2LoopNTimes',
+            'v2Loop',
+            'v2BreakLoop',
+            'v2Command',
+            'v2ConsoleLog',
+            'v2RunTrigger',
+            'v2StopTrigger'
+        ],
+        'Chat': [
+            'v2CutChat',
+            'v2ModifyChat',
+            'v2Impersonate',
+            'v2GetLastMessage',
+            'v2GetLastUserMessage',
+            'v2GetLastCharMessage',
+            'v2GetMessageAtIndex',
+            'v2GetMessageCount',
+            'v2GetFirstMessage',
+            'v2QuickSearchChat'
+        ],
+        'Low Level': [
+            'v2SendAIprompt',
+            'v2ImgGen',
+            'v2CheckSimilarity',
+            'v2RunLLM'
+        ],
+        'Alert': [
+            'v2ShowAlert',
+            'v2GetAlertInput',
+            'v2GetAlertSelect'
+        ],
+        'Lorebook V2': [
+            'v2GetAllLorebooks',
+            'v2GetLorebookByName',
+            'v2GetLorebookByIndex',
+            'v2CreateLorebook',
+            'v2ModifyLorebookByIndex',
+            'v2DeleteLorebookByIndex',
+            'v2GetLorebookCountNew',
+            'v2SetLorebookAlwaysActive'
+        ],
+        'String': [
+            'v2RegexTest',
+            'v2ExtractRegex',
+            'v2GetCharAt',
+            'v2GetCharCount',
+            'v2ToLowerCase',
+            'v2ToUpperCase',
+            'v2SetCharAt',
+            'v2SplitString',
+            'v2ConcatString'
+        ],
+        'Data': [
+            'v2GetCharacterDesc',
+            'v2SetCharacterDesc',
+            'v2GetPersonaDesc',
+            'v2SetPersonaDesc',
+            'v2GetReplaceGlobalNote',
+            'v2SetReplaceGlobalNote',
+            'v2GetAuthorNote',
+            'v2SetAuthorNote'
+        ],
+        'Array': [
+            'v2MakeArrayVar',
+            'v2GetArrayVarLength',
+            'v2GetArrayVar',
+            'v2SetArrayVar',
+            'v2PushArrayVar',
+            'v2PopArrayVar',
+            'v2ShiftArrayVar',
+            'v2UnshiftArrayVar',
+            'v2SpliceArrayVar',
+            'v2SliceArrayVar',
+            'v2GetIndexOfValueInArrayVar',
+            'v2RemoveIndexFromArrayVar',
+            'v2JoinArrayVar'
+        ],
+        'Others': [
+            'v2Random',
+            'v2UpdateGUI',
+            'v2SystemPrompt',
+            'v2UpdateChatAt',
+            'v2Wait',
+            'v2StopPromptSending',
+            'v2Tokenize'
+        ],
+        'Deprecated': [
+            'v2If',
+            'v2ModifyLorebook',
+            'v2GetLorebook',
+            'v2GetLorebookCount',
+            'v2GetLorebookEntry',
+            'v2SetLorebookActivation',
+            'v2GetLorebookIndexViaName'
+        ]
     }
 
-    const deprecatedCategories = {
-        'Deprecated': ['v2If', 'v2ModifyLorebook', 'v2GetLorebook', 'v2GetLorebookCount', 'v2GetLorebookEntry', 'v2SetLorebookActivation', 'v2GetLorebookIndexViaName']
-    }
-
-    const deprecatedEffectV2Types = [
-        //Deprecated
-        'v2If',
-        'v2ModifyLorebook',
-        'v2GetLorebook',
-        'v2GetLorebookCount',
-        'v2GetLorebookEntry',
-        'v2SetLorebookActivation',
-        'v2GetLorebookIndexViaName',
-    ]
-
-
-    const lowLevelOnly = [
-        'v2SendAIprompt',
-        'v2RunLLM',
-        'v2CheckSimilarity',
-        'v2ImgGen',
-
-    ]
-
-    const specialTypes = [
-        'v2GetDisplayState',
-        'v2SetDisplayState',
-        'v2GetRequestState',
-        'v2SetRequestState',
-        'v2GetRequestStateRole',
-        'v2SetRequestStateRole',
-        'v2GetRequestStateLength',
-    ]
-    
     let lastClickTime = 0
     let { value = $bindable([]), lowLevelAble = false }: Props = $props();
     let selectedIndex = $state(0);
@@ -208,15 +172,14 @@
     $effect(() => {
         if(menuMode === 0 && selectedIndex > 0) {
             setTimeout(() => updateGuideLines(), 10)
-            setTimeout(() => updateGuideLines(), 30)
             setTimeout(() => updateGuideLines(), 50)
         }
     })
 
     const getFilteredTriggers = () => {
         const allCategories = DBState.db.showDeprecatedTriggerV2 
-            ? { ...effectCategories, ...deprecatedCategories }
-            : effectCategories
+            ? effectCategories
+            : Object.fromEntries(Object.entries(effectCategories).filter(([key]) => key !== 'Deprecated'))
         
         const categoryTriggers = allCategories[selectedCategory] || []
         return categoryTriggers.filter(checkSupported)
@@ -224,8 +187,8 @@
 
     const getAvailableCategories = () => {
         const allCategories = DBState.db.showDeprecatedTriggerV2 
-            ? { ...effectCategories, ...deprecatedCategories }
-            : effectCategories
+            ? effectCategories
+            : Object.fromEntries(Object.entries(effectCategories).filter(([key]) => key !== 'Deprecated'))
         
         return Object.keys(allCategories).filter(category => {
             const categoryTriggers = allCategories[category] || []
@@ -251,14 +214,14 @@
         if(value[selectedIndex].type === 'request'){
             return requestAllowList.includes(e)
         }
-        if(specialTypes.includes(e)){
+        if(effectCategories['Special'].includes(e)){
             return false
         }
 
         if(lowLevelAble){
             return true
         }
-        return !lowLevelOnly.includes(e)
+        return !effectCategories['Low Level'].includes(e)
     }
     const makeDefaultEditType = (type:string) => {
         switch(type){
@@ -590,6 +553,17 @@
                     type: 'v2SplitString',
                     source: '',
                     sourceType: 'value',
+                    delimiter: '',
+                    delimiterType: 'value',
+                    outputVar: '',
+                    indent: 0
+                }
+                break;
+            case 'v2JoinArrayVar':
+                editTrigger = {
+                    type: 'v2JoinArrayVar',
+                    var: '',
+                    varType: 'value',
                     delimiter: '',
                     delimiterType: 'value',
                     outputVar: '',
@@ -1665,7 +1639,7 @@
                         <div class="hidden md:flex md:flex-1 md:flex-col md:overflow-y-auto">
                             {#each getAvailableCategories() as category}
                                 <button 
-                                    class="w-full p-3 text-left hover:bg-selected transition-colors"
+                                    class="w-full p-3 text-left hover:bg-selected hover:text-textcolor transition-colors"
                                     class:bg-selected={selectedCategory === category}
                                     class:text-textcolor={selectedCategory === category}
                                     class:text-textcolor2={selectedCategory !== category}
@@ -1702,7 +1676,7 @@
                             {#each getFilteredTriggers() as type}
                                 <button 
                                     class="w-full p-3 text-left hover:bg-selected transition-colors text-textcolor2 hover:text-textcolor" 
-                                    class:opacity-60={deprecatedEffectV2Types.includes(type)} 
+                                    class:opacity-60={effectCategories.Deprecated.includes(type)} 
                                     onclick={(e) => {
                                         e.stopPropagation()
                                         makeDefaultEditType(type)
@@ -1711,7 +1685,7 @@
                                 >
                                     <div>
                                         {language.triggerDesc[type]}
-                                        {#if deprecatedEffectV2Types.includes(type)}
+                                        {#if effectCategories.Deprecated.includes(type)}
                                             <span class="text-xs opacity-60 ml-1">(Deprecated)</span>
                                         {/if}
                                     </div>
@@ -2118,6 +2092,22 @@
                             <OptionInput value="var">{language.var}</OptionInput>
                         </SelectInput>
                         <TextInput bind:value={editTrigger.source} />
+                        <span>{language.delimiter}</span>
+                        <SelectInput bind:value={editTrigger.delimiterType}>
+                            <OptionInput value="value">{language.value}</OptionInput>
+                            <OptionInput value="var">{language.var}</OptionInput>
+                        </SelectInput>
+                        <TextInput bind:value={editTrigger.delimiter} />
+                        <span class="block text-textcolor">{language.outputVar}</span>
+                        <TextInput bind:value={editTrigger.outputVar} />
+
+                    {:else if editTrigger.type === 'v2JoinArrayVar'}
+                        <span class="block text-textcolor">{language.var}</span>
+                        <SelectInput bind:value={editTrigger.varType}>
+                            <OptionInput value="value">{language.value}</OptionInput>
+                            <OptionInput value="var">{language.var}</OptionInput>
+                        </SelectInput>
+                        <TextInput bind:value={editTrigger.var} />
                         <span>{language.delimiter}</span>
                         <SelectInput bind:value={editTrigger.delimiterType}>
                             <OptionInput value="value">{language.value}</OptionInput>
