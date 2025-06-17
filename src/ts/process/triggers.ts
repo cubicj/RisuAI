@@ -41,7 +41,8 @@ export type triggerEffectV2 =   triggerV2Header|triggerV2IfVar|triggerV2Else|tri
                                 triggerV2GetRequestState|triggerV2SetRequestState|triggerV2GetRequestStateRole|triggerV2SetRequestStateRole|triggerV2GetReuqestStateLength|triggerV2IfAdvanced|
                                 triggerV2QuickSearchChat|triggerV2StopPromptSending|triggerV2Tokenize|triggerV2GetAllLorebooks|triggerV2GetLorebookByName|triggerV2GetLorebookByIndex|
                                 triggerV2CreateLorebook|triggerV2ModifyLorebookByIndex|triggerV2DeleteLorebookByIndex|triggerV2GetLorebookCountNew|triggerV2SetLorebookAlwaysActive|
-                                triggerV2QuickSearchChat|triggerV2StopPromptSending|triggerV2Tokenize|triggerV2RegexTest
+                                triggerV2QuickSearchChat|triggerV2StopPromptSending|triggerV2Tokenize|triggerV2RegexTest|triggerV2GetReplaceGlobalNote|triggerV2SetReplaceGlobalNote|
+                                triggerV2GetAuthorNote|triggerV2SetAuthorNote
 
 export type triggerConditionsVar = {
     type:'var'|'value'
@@ -823,6 +824,32 @@ export type triggerV2GetAlertSelect = {
     value: string,
     valueType: 'var'|'value',
     outputVar: string,
+    indent: number
+}
+
+export type triggerV2GetReplaceGlobalNote = {
+    type: 'v2GetReplaceGlobalNote',
+    outputVar: string,
+    indent: number
+}
+
+export type triggerV2SetReplaceGlobalNote = {
+    type: 'v2SetReplaceGlobalNote',
+    value: string,
+    valueType: 'var'|'value',
+    indent: number
+}
+
+export type triggerV2GetAuthorNote = {
+    type: 'v2GetAuthorNote',
+    outputVar: string,
+    indent: number
+}
+
+export type triggerV2SetAuthorNote = {
+    type: 'v2SetAuthorNote',
+    value: string,
+    valueType: 'var'|'value',
     indent: number
 }
 
@@ -1788,6 +1815,19 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                     }
                     break
                 }
+                case 'v2GetReplaceGlobalNote':{
+                    setVar(effect.outputVar, char.replaceGlobalNote ?? '')
+                    break
+                }
+                case 'v2SetReplaceGlobalNote':{
+                    const value = effect.valueType === 'value' ? risuChatParser(effect.value,{chara:char}) : getVar(risuChatParser(effect.value,{chara:char}))
+                    char.replaceGlobalNote = value
+                    const selectedCharId = get(selectedCharID)
+                    const db = getDatabase();
+                    (db.characters[selectedCharId] as character).replaceGlobalNote = value
+                    setCurrentCharacter(char)
+                    break
+                }
                 case 'v2MakeArrayVar':{
                     if(effect.var.startsWith('[') && effect.var.endsWith(']')){
                         return
@@ -2225,6 +2265,24 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                         setVar(effect.outputVar, result ? '1' : '0')
                     } catch (error) {
                         setVar(effect.outputVar, '0')
+                    }
+                    break
+                }
+                case 'v2GetAuthorNote':{
+                    setVar(effect.outputVar, chat.note ?? '')
+                    break
+                }
+                case 'v2SetAuthorNote':{
+                    const value = effect.valueType === 'value' ? risuChatParser(effect.value,{chara:char}) : getVar(risuChatParser(effect.value,{chara:char}))
+                    chat.note = value
+                    
+                    if(!arg.displayMode){
+                        const selectedCharId = get(selectedCharID)
+                        const currentCharacter = getCurrentCharacter()
+                        const db = getDatabase()
+                        currentCharacter.chats[currentCharacter.chatPage].note = value
+                        db.characters[selectedCharId].chats[currentCharacter.chatPage].note = value
+                        setCurrentCharacter(currentCharacter)
                     }
                     break
                 }
