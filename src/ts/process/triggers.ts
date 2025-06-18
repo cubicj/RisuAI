@@ -44,7 +44,7 @@ export type triggerEffectV2 =   triggerV2Header|triggerV2IfVar|triggerV2Else|tri
                                 triggerV2CreateLorebook|triggerV2ModifyLorebookByIndex|triggerV2DeleteLorebookByIndex|triggerV2GetLorebookCountNew|triggerV2SetLorebookAlwaysActive|
                                 triggerV2QuickSearchChat|triggerV2StopPromptSending|triggerV2Tokenize|triggerV2RegexTest|triggerV2GetReplaceGlobalNote|triggerV2SetReplaceGlobalNote|
                                 triggerV2GetAuthorNote|triggerV2SetAuthorNote|triggerV2MakeDictVar|triggerV2GetDictVar|triggerV2SetDictVar|triggerV2DeleteDictKey|
-                                triggerV2HasDictKey|triggerV2ClearDict|triggerV2GetDictSize|triggerV2GetDictKeys|triggerV2GetDictValues|triggerV2Calculate
+                                triggerV2HasDictKey|triggerV2ClearDict|triggerV2GetDictSize|triggerV2GetDictKeys|triggerV2GetDictValues|triggerV2Calculate|triggerV2ReplaceString
 
 export type triggerConditionsVar = {
     type:'var'|'value'
@@ -465,7 +465,7 @@ export type triggerV2SplitString = {
     source: string,
     sourceType: 'var'|'value',
     delimiter: string,
-    delimiterType: 'var'|'value',
+    delimiterType: 'var'|'value'|'regex',
     outputVar: string,
     indent: number
 }
@@ -945,6 +945,20 @@ export type triggerV2Calculate = {
     type: 'v2Calculate',
     expression: string,
     expressionType: 'var'|'value',
+    outputVar: string,
+    indent: number
+}
+
+export type triggerV2ReplaceString = {
+    type: 'v2ReplaceString',
+    source: string,
+    sourceType: 'var'|'value',
+    regex: string,
+    regexType: 'var'|'value',
+    replacement: string,
+    replacementType: 'var'|'value',
+    flags: string,
+    flagsType: 'var'|'value',
     outputVar: string,
     indent: number
 }
@@ -1881,8 +1895,36 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                 }
                 case 'v2SplitString':{
                     let source = effect.sourceType === 'value' ? risuChatParser(effect.source,{chara:char}) : getVar(risuChatParser(effect.source,{chara:char}))
-                    let delimiter = effect.delimiterType === 'value' ? risuChatParser(effect.delimiter,{chara:char}) : getVar(risuChatParser(effect.delimiter,{chara:char}))
-                    setVar(effect.outputVar, JSON.stringify(source.split(delimiter)))
+                    let delimiter: string
+                    
+                    if (effect.delimiterType === 'value') {
+                        delimiter = risuChatParser(effect.delimiter,{chara:char})
+                    } else if (effect.delimiterType === 'var') {
+                        delimiter = getVar(risuChatParser(effect.delimiter,{chara:char}))
+                    } else {
+                        delimiter = risuChatParser(effect.delimiter,{chara:char})
+                    }
+                    
+                    let result: string[]
+                    if (effect.delimiterType === 'regex') {
+                        try {
+                            const regexMatch = delimiter.match(/^\/(.+)\/([gimuy]*)$/)
+                            if (regexMatch) {
+                                const [, pattern, flags] = regexMatch
+                                const regex = new RegExp(pattern, flags)
+                                result = source.split(regex)
+                            } else {
+                                const regex = new RegExp(delimiter)
+                                result = source.split(regex)
+                            }
+                        } catch (error) {
+                            result = [source]
+                        }
+                    } else {
+                        result = source.split(delimiter)
+                    }
+                    
+                    setVar(effect.outputVar, JSON.stringify(result))
                     break
                 }
                 case 'v2JoinArrayVar':{
@@ -2519,6 +2561,22 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                         setVar(effect.outputVar, result.toString())
                     } catch (error) {
                         setVar(effect.outputVar, '0')
+                    }
+                    break
+                }
+                case 'v2ReplaceString':{
+                    try {
+                        const source = effect.sourceType === 'value' ? risuChatParser(effect.source,{chara:char}) : getVar(risuChatParser(effect.source,{chara:char}))
+                        const regexPattern = effect.regexType === 'value' ? risuChatParser(effect.regex,{chara:char}) : getVar(risuChatParser(effect.regex,{chara:char}))
+                        const replacement = effect.replacementType === 'value' ? risuChatParser(effect.replacement,{chara:char}) : getVar(risuChatParser(effect.replacement,{chara:char}))
+                        const flags = effect.flagsType === 'value' ? risuChatParser(effect.flags,{chara:char}) : getVar(risuChatParser(effect.flags,{chara:char}))
+                        
+                        const regex = new RegExp(regexPattern, flags)
+                        const result = source.replace(regex, replacement)
+                        setVar(effect.outputVar, result)
+                    } catch (error) {
+                        const source = effect.sourceType === 'value' ? risuChatParser(effect.source,{chara:char}) : getVar(risuChatParser(effect.source,{chara:char}))
+                        setVar(effect.outputVar, source)
                     }
                     break
                 }
