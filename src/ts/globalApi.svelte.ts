@@ -44,11 +44,14 @@ import { fetch as TauriHTTPFetch } from '@tauri-apps/plugin-http';
 import { moduleUpdate } from "./process/modules";
 import type { AccountStorage } from "./storage/accountStorage";
 import { makeColdData } from "./process/coldstorage.svelte";
+import { compare } from 'fast-json-patch'
 
 //@ts-ignore
 export const isTauri = !!window.__TAURI_INTERNALS__
 //@ts-ignore
 export const isNodeServer = !!globalThis.__NODE__
+//@ts-ignore
+export const supportsPatchSync = !!globalThis.__PATCH_SYNC__
 export const forageStorage = new AutoStorage()
 export const googleBuild = false
 export const isMobile = navigator.userAgent.match(/(iPad)|(iPhone)|(iPod)|(android)|(webOS)/i)
@@ -313,9 +316,47 @@ export async function loadAsset(id:string){
 }
 
 let lastSave = ''
+let lastSyncedDb: any = null
+let dbVersion = 0 // Track local database version for patch sync
 export let saving = $state({
     state: false
 })
+
+/**
+ * Attempts to save database changes using patch synchronization.
+ * @returns {Promise<boolean>} Returns true if patch was successfully applied or no changes exist, false if full save is required.
+ */
+async function tryPatchSave(db: Database): Promise<boolean> {
+    // Initial save cannot use patch, so return false to trigger full save.
+    if (lastSyncedDb === null) {
+        return false;
+    }
+
+    try {
+        const serializedDb = $state.snapshot(db);
+        const patch = compare(lastSyncedDb, serializedDb);
+
+        if (patch.length > 0) {
+            const success = await forageStorage.patchItem('database/database.bin', {
+                patch: patch,
+                expectedVersion: dbVersion
+            });
+
+            if (success) {
+                lastSyncedDb = serializedDb;
+                dbVersion++;
+                console.log(`[Patch] Successfully applied patch, new version: ${dbVersion}`);
+                return true;
+            }
+            console.warn('[Patch] Patch failed, falling back to full save');
+            return false;
+        }
+        return true; // No changes detected, treat as success
+    } catch (error) {
+        console.error('[Patch] Error during patch attempt:', error);
+        return false; // Fall back to full save on error
+    }
+}
 
 /**
  * Saves the current state of the database.
@@ -398,11 +439,29 @@ export async function saveDb(){
                 await writeFile('database/database.bin', dbData, {baseDir: BaseDirectory.AppData});
                 await writeFile(`database/dbbackup-${(Date.now()/100).toFixed()}.bin`, dbData, {baseDir: BaseDirectory.AppData});
             }
-            else{
-                if(!forageStorage.isAccount){
-                    const dbData = encodeRisuSaveLegacy(db)
-                    await forageStorage.setItem('database/database.bin', dbData)
-                    await forageStorage.setItem(`database/dbbackup-${(Date.now()/100).toFixed()}.bin`, dbData)
+            else{                
+                if(!forageStorage.isAccount){                    
+                    // Patch-based sync for Node server                    
+                    if (isNodeServer && supportsPatchSync) {
+                        const patchSuccessful = await tryPatchSave(db);
+
+                        // If this is the first save or patch failed, fall back to full save.
+                        if (!patchSuccessful) {
+                            const dbData = encodeRisuSaveLegacy(db);
+                            await forageStorage.setItem('database/database.bin', dbData);
+                            await forageStorage.setItem(`database/dbbackup-${(Date.now()/100).toFixed()}.bin`, dbData);
+
+                            // (Re)initialize patch tracking state after full save.
+                            lastSyncedDb = $state.snapshot(db);
+                            dbVersion = 0;
+                            console.log('[Patch] Full save completed, patch tracking (re)initialized.');
+                        }
+                    } else {
+                        // Standard save method for environments that don't support patches 
+                        const dbData = encodeRisuSaveLegacy(db);
+                        await forageStorage.setItem('database/database.bin', dbData);
+                        await forageStorage.setItem(`database/dbbackup-${(Date.now()/100).toFixed()}.bin`, dbData);
+                    }
                 }
                 if(forageStorage.isAccount){
                     const dbData = await encodeRisuSave(db)
@@ -480,7 +539,7 @@ async function getDbBackups() {
         return backups
     }
     else{
-        const keys = await forageStorage.keys()
+        const keys = await forageStorage.keys("database/dbbackup-")
 
         const backups = keys
           .filter(key => key.startsWith('database/dbbackup-'))
@@ -570,6 +629,8 @@ export async function loadData() {
                     const decoded = await decodeRisuSave(gotStorage)
                     console.log(decoded)
                     setDatabase(decoded)
+                    lastSyncedDb = $state.snapshot(decoded)
+                    dbVersion = 0 // Initialize version tracking
                 } catch (error) {
                     console.error(error)
                     const backups = await getDbBackups()
