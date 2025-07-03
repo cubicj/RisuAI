@@ -8,6 +8,91 @@ const crypto = require('crypto')
 const { applyPatch } = require('fast-json-patch')
 const { Packr, Unpackr, decode } = require('msgpackr')
 const fflate = require('fflate')
+
+// Compositional hash function for JSON objects in O(n)
+function compositionalHash(obj) {
+    const PRIME_MULTIPLIER = 31;
+    
+    const SEED_OBJECT = 17;
+    const SEED_ARRAY = 19;
+    const SEED_STRING = 23;
+    const SEED_NUMBER = 29;
+    const SEED_BOOLEAN = 31;
+    const SEED_NULL = 37;
+    
+    function calculateHash(node) {
+        if (node === null || node === undefined) return SEED_NULL;
+
+        switch (typeof node) {
+            case 'object':
+                if (Array.isArray(node)) {
+                    let arrayHash = SEED_ARRAY;
+                    for (const item of node)
+                        arrayHash = (Math.imul(arrayHash, PRIME_MULTIPLIER) + calculateHash(item)) >>> 0;
+                    return arrayHash;
+                } else {
+                    let objectHash = SEED_OBJECT;
+                    for (const key in node)
+                        objectHash = (objectHash ^ (Math.imul(calculateHash(key), PRIME_MULTIPLIER) + calculateHash(node[key]))) >>> 0;
+                    return objectHash;
+                }
+
+            case 'string':
+                let strHash = 2166136261;
+                for (let i = 0; i < node.length; i++)
+                    strHash = Math.imul(strHash ^ node.charCodeAt(i), 16777619);
+                return Math.imul(SEED_STRING, PRIME_MULTIPLIER) + (strHash >>> 0);
+
+            case 'number':
+                let numHash;
+                if (Number.isInteger(node) && node >= -2147483648 && node <= 2147483647) 
+                    numHash = node >>> 0; 
+                else {
+                    const str = node.toString();
+                    numHash = 2166136261;
+                    for (let i = 0; i < str.length; i++) 
+                        numHash = Math.imul(numHash ^ str.charCodeAt(i), 16777619);
+                    numHash = numHash >>> 0;
+                }
+                return Math.imul(SEED_NUMBER, PRIME_MULTIPLIER) + numHash;
+
+            case 'boolean':
+                return Math.imul(SEED_BOOLEAN, PRIME_MULTIPLIER) + (node ? 1 : 0);
+                
+            default:
+                return 0;
+        }
+    }
+    
+    const hash = calculateHash(obj);
+    return hash.toString(16); 
+}
+// Faster normalization than JSON.parse(JSON.stringify())
+function normalizeJSON(value) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    if (typeof value !== 'object') {
+        return value; // Primitives are copied by value
+    }
+    if (Array.isArray(value)) {
+        const newArray = [];
+        for (const item of value) {
+            if (item === undefined) newArray.push(null);
+            else newArray.push(normalizeJSON(item));
+        }
+        return newArray;
+    }
+    const newObj = {};
+    for (const key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+            const propValue = value[key];
+            if (propValue !== undefined) newObj[key] = normalizeJSON(propValue);
+        }
+    }
+    return newObj;
+}
+
 app.use(express.static(path.join(process.cwd(), 'dist'), {index: false}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '50mb' }));
@@ -30,9 +115,8 @@ if (enablePatchSync) {
     }
 }
 
-// In-memory database cache for patch-based sync with versioning
+// In-memory database cache for patch-based sync
 let dbCache = {}
-let dbVersions = {} // Track version numbers for each file
 let saveTimers = {}
 const SAVE_INTERVAL = 5000 // Save to disk after 5 seconds of inactivity
 
@@ -393,9 +477,6 @@ app.get('/api/read', async (req, res, next) => {
             delete dbCache[filePath];
         }
 
-        // reset version after read operation
-        dbVersions[filePath] = 0;
-        
         // read from disk
         if(!existsSync(path.join(savePath, filePath))){
             res.send();
@@ -488,15 +569,16 @@ app.post('/api/write', async (req, res, next) => {
 
     try {
         await fs.writeFile(path.join(savePath, filePath), fileContent);
-        // Clear cache for this file since it was directly written
-        if (dbCache[filePath]) delete dbCache[filePath];
+        
         // Clear any pending save timer for this file
         if (saveTimers[filePath]) {
             clearTimeout(saveTimers[filePath]);
             delete saveTimers[filePath];
         }
-        // Reset version to 0 after direct write
-        dbVersions[filePath] = 0;
+
+        // Clear cache for this file since it was directly written
+        if (dbCache[filePath]) delete dbCache[filePath];
+
         res.send({
             success: true
         });
@@ -523,11 +605,11 @@ app.post('/api/patch', async (req, res, next) => {
     }
     const filePath = req.headers['file-path'];
     const patch = req.body.patch;
-    const clientVersion = parseInt(req.body.expectedVersion) || 0;
+    const expectedHash = req.body.expectedHash;
     
-    if (!filePath || !patch) {
+    if (!filePath || !patch || !expectedHash) {
         res.status(400).send({
-            error:'File path and patch required'
+            error:'File path, patch, and expected hash required'
         });
         return;
     }
@@ -541,37 +623,32 @@ app.post('/api/patch', async (req, res, next) => {
     try {
         const decodedFilePath = Buffer.from(filePath, 'hex').toString('utf-8');
         
-        // Initialize version if not exists
-        if (!dbVersions[filePath]) dbVersions[filePath] = 0;
-        
-        // Check version mismatch
-        const serverVersion = dbVersions[filePath];
-        if (clientVersion !== serverVersion) {
-            console.log(`[Patch] Version mismatch for ${decodedFilePath}: client=${clientVersion}, server=${serverVersion}`);
-            res.status(409).send({
-                error: 'Version mismatch',
-            });
-            return;
-        }
-        
         // Load database into memory if not already cached
         if (!dbCache[filePath]) {
             const fullPath = path.join(savePath, filePath);
             if (existsSync(fullPath)) {
                 const fileContent = await fs.readFile(fullPath);
-                dbCache[filePath] = await decodeRisuSaveServer(fileContent);
+                dbCache[filePath] = normalizeJSON(await decodeRisuSaveServer(fileContent));
             } 
             else {
                 dbCache[filePath] = {};
             }
         }
         
-        // Apply patch to in-memory database
-        const result = applyPatch(dbCache[filePath], patch, false);
+        // Calculate current hash of the server data using compositional hash
+        const serverHash = compositionalHash(dbCache[filePath]);
         
-        // Increment version after successful patch
-        dbVersions[filePath]++;
-        const newVersion = dbVersions[filePath];
+        // Check hash mismatch
+        if (expectedHash !== serverHash) {
+            console.log(`[Patch] Hash mismatch for ${decodedFilePath}: expected=${expectedHash}..., server=${serverHash}...`);
+            res.status(409).send({
+                error: 'Hash mismatch - data out of sync',
+            });
+            return;
+        }
+        
+        // Apply patch to in-memory database
+        const result = applyPatch(dbCache[filePath], patch, true);
 
         // Schedule save to disk (debounced)
         if (saveTimers[filePath]) {
@@ -596,7 +673,6 @@ app.post('/api/patch', async (req, res, next) => {
                     }
                 }
             } catch (error) {
-                dbVersions[filePath] = 0; // reset version on save error, trigger full save next time
                 console.error(`[Patch] Error saving ${filePath}:`, error);
             } finally {
                 delete saveTimers[filePath];
@@ -606,7 +682,6 @@ app.post('/api/patch', async (req, res, next) => {
         res.send({
             success: true,
             appliedOperations: result.length,
-            newVersion: newVersion
         });
     } catch (error) {
         console.error(`[Patch] Error applying patch to ${filePath}:`, error.name);

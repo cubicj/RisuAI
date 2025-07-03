@@ -317,7 +317,92 @@ export async function loadAsset(id:string){
 
 let lastSave = ''
 let lastSyncedDb: any = null
-let dbVersion = 0 // Track local database version for patch sync
+let lastSyncHash = ''
+
+// Compositional hash function for JSON objects in O(n)
+function compositionalHash(obj: any): string {
+    const PRIME_MULTIPLIER = 31;
+    
+    const SEED_OBJECT = 17;
+    const SEED_ARRAY = 19;
+    const SEED_STRING = 23;
+    const SEED_NUMBER = 29;
+    const SEED_BOOLEAN = 31;
+    const SEED_NULL = 37;
+    
+    function calculateHash(node: any): number {
+        if (node === null || node === undefined) return SEED_NULL;
+
+        switch (typeof node) {
+            case 'object':
+                if (Array.isArray(node)) {
+                    let arrayHash = SEED_ARRAY;
+                    for (const item of node)
+                        arrayHash = (Math.imul(arrayHash, PRIME_MULTIPLIER) + calculateHash(item)) >>> 0;
+                    return arrayHash;
+                } else {
+                    let objectHash = SEED_OBJECT;
+                    for (const key in node)
+                        objectHash = (objectHash ^ (Math.imul(calculateHash(key), PRIME_MULTIPLIER) + calculateHash(node[key]))) >>> 0;
+                    return objectHash;
+                }
+
+            case 'string':
+                let strHash = 2166136261;
+                for (let i = 0; i < node.length; i++)
+                    strHash = Math.imul(strHash ^ node.charCodeAt(i), 16777619);
+                return Math.imul(SEED_STRING, PRIME_MULTIPLIER) + (strHash >>> 0);
+
+            case 'number':
+                let numHash;
+                if (Number.isInteger(node) && node >= -2147483648 && node <= 2147483647) 
+                    numHash = node >>> 0; 
+                else {
+                    const str = node.toString();
+                    numHash = 2166136261;
+                    for (let i = 0; i < str.length; i++) 
+                        numHash = Math.imul(numHash ^ str.charCodeAt(i), 16777619);
+                    numHash = numHash >>> 0;
+                }
+                return Math.imul(SEED_NUMBER, PRIME_MULTIPLIER) + numHash;
+
+            case 'boolean':
+                return Math.imul(SEED_BOOLEAN, PRIME_MULTIPLIER) + (node ? 1 : 0);
+                
+            default:
+                return 0;
+        }
+    }
+    
+    const hash = calculateHash(obj);
+    return hash.toString(16); 
+}
+// Faster normalization than JSON.parse(JSON.stringify())
+function normalizeJSON(value: any): any {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    if (typeof value !== 'object') {
+        return value; // Primitives are copied by value
+    }
+    if (Array.isArray(value)) {
+        const newArray = [];
+        for (const item of value) {
+            if (item === undefined) newArray.push(null);
+            else newArray.push(normalizeJSON(item));
+        }
+        return newArray;
+    }
+    const newObj = {};
+    for (const key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+            const propValue = value[key];
+            if (propValue !== undefined) newObj[key] = normalizeJSON(propValue);
+        }
+    }
+    return newObj;
+}
+
 export let saving = $state({
     state: false
 })
@@ -326,34 +411,23 @@ export let saving = $state({
  * Attempts to save database changes using patch synchronization.
  * @returns {Promise<boolean>} Returns true if patch was successfully applied or no changes exist, false if full save is required.
  */
-async function tryPatchSave(db: Database): Promise<boolean> {
+async function tryPatchSave(db: any): Promise<boolean> {
     // Initial save cannot use patch, so return false to trigger full save.
     if (lastSyncedDb === null) {
         return false;
     }
 
     try {
-        const serializedDb = $state.snapshot(db);
-        const patch = compare(lastSyncedDb, serializedDb);
-
+        const patch = compare(lastSyncedDb, db);
         if (patch.length > 0) {
             const success = await forageStorage.patchItem('database/database.bin', {
                 patch: patch,
-                expectedVersion: dbVersion
+                expectedHash: lastSyncHash
             });
-
-            if (success) {
-                lastSyncedDb = serializedDb;
-                dbVersion++;
-                console.log(`[Patch] Successfully applied patch, new version: ${dbVersion}`);
-                return true;
-            }
-            console.warn('[Patch] Patch failed, falling back to full save');
-            return false;
+            return success;
         }
         return true; // No changes detected, treat as success
     } catch (error) {
-        console.error('[Patch] Error during patch attempt:', error);
         return false; // Fall back to full save on error
     }
 }
@@ -443,19 +517,19 @@ export async function saveDb(){
                 if(!forageStorage.isAccount){                    
                     // Patch-based sync for Node server                    
                     if (isNodeServer && supportsPatchSync) {
-                        const patchSuccessful = await tryPatchSave(db);
+                        const dbSnapshot = normalizeJSON(db);
+                        const patchSuccessful = await tryPatchSave(dbSnapshot);
 
                         // If this is the first save or patch failed, fall back to full save.
                         if (!patchSuccessful) {
-                            const dbData = encodeRisuSaveLegacy(db);
+                            const dbData = encodeRisuSaveLegacy(dbSnapshot);
                             await forageStorage.setItem('database/database.bin', dbData);
                             await forageStorage.setItem(`database/dbbackup-${(Date.now()/100).toFixed()}.bin`, dbData);
-
-                            // (Re)initialize patch tracking state after full save.
-                            lastSyncedDb = $state.snapshot(db);
-                            dbVersion = 0;
-                            console.log('[Patch] Full save completed, patch tracking (re)initialized.');
                         }
+
+                        // Update last synced database and hash using compositional hash
+                        lastSyncedDb = dbSnapshot;
+                        lastSyncHash = compositionalHash(dbSnapshot);
                     } else {
                         // Standard save method for environments that don't support patches 
                         const dbData = encodeRisuSaveLegacy(db);
@@ -629,8 +703,9 @@ export async function loadData() {
                     const decoded = await decodeRisuSave(gotStorage)
                     console.log(decoded)
                     setDatabase(decoded)
-                    lastSyncedDb = $state.snapshot(decoded)
-                    dbVersion = 0 // Initialize version tracking
+                    // Initialize compositional hash tracking
+                    lastSyncedDb = normalizeJSON(decoded)
+                    lastSyncHash = compositionalHash(lastSyncedDb);
                 } catch (error) {
                     console.error(error)
                     const backups = await getDbBackups()
