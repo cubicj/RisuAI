@@ -716,8 +716,10 @@ export function setDatabase(data:Database){
         modules: true,
         globalVariables: true,
         preset: true,
-        persona: true
+        persona: true,
+        hypaV3Preset: true
     }
+    data.loadoutApplyOptions.hypaV3Preset ??= true
     data.longPressToPopupEditor ??= false
     data.customSidebarItems ??= []
     data.moveInsteadOfCopyOnCMPConvert ??= false
@@ -1287,6 +1289,7 @@ export interface Database{
         globalVariables: boolean
         preset: boolean
         persona: boolean
+        hypaV3Preset: boolean
     }
     disableAprilFools?:boolean
     customSidebarItems: CustomSideBarItem[]
